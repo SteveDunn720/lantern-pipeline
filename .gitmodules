@@ -20,3 +20,6 @@
 [submodule "pipeline/lib/y-rig"]
 	path = src/dcc/maya/third_party/y-rig
 	url = https://github.com/michaelharmonart/y-rig.git
+[submodule "src/dcc/maya/third_party/nxt_editor_git"]
+	path = src/dcc/maya/third_party/nxt_editor_git
+	url = https://github.com/nxt-dev/nxt_editor.git
