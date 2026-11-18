@@ -36,6 +36,7 @@ class MayaLauncher(Launcher):
         repo_root = src_path.parent
         third_party = this_path.parent / "third_party"
         site_path = this_path.parent / "site"
+        plugin_path = site_path / "plugins"
         rig_build_path = get_rig_build_path()
         system = platform.system()
 
@@ -65,7 +66,7 @@ class MayaLauncher(Launcher):
             "MAYAUSD_EXPORT_MAP1_AS_PRIMARY_UV_SET": 1,
             "MAYAUSD_IMPORT_PRIMARY_UV_SET_AS_MAP1": 1,
             "MAYA_MODULE_PATH": os.pathsep.join(module_paths),
-            "MAYA_PLUG_IN_PATH": str(site_path),
+            "MAYA_PLUG_IN_PATH": str(plugin_path),
             "PIPE_TELEMETRY_SPOOL_DIR": str(get_shared_telemetry_spool_dir()),
             # PYTHONPATH:
             #   1. src/ — so framework, core, dcc, env, env_sg are importable
@@ -115,6 +116,7 @@ class MayaLauncher(Launcher):
                 third_party / "y-rig/shifter/components/"
             ),
             "MGEAR_SHIFTER_CUSTOMSTEP_PATH": str(rig_build_path),
+            "NXT_SITE_DIR": str(site_path / "nxt"),
         }
 
         launch_command = ""
