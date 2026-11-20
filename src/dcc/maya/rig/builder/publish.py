@@ -7,9 +7,9 @@ from env_sg import DB_Config
 from maya import cmds
 
 from core.asset import paths_for_asset
-from dcc.maya.util.selection import maintain_selection
 from core.shotgrid import ShotGrid
 from core.versioning import next_version, versioned_filename
+from dcc.maya.util.selection import maintain_selection
 
 from .build import RigBuilder, RigDefinition
 from .progress import ProgressStep, TestProgressManager
@@ -55,6 +55,7 @@ class RigPublisher:
         rig_builder = RigBuilder()
         rig_builder.connect_progress(self.build_progress.update_progress)
         rig_build_result = rig_builder.build_rig(rig)
+        cmds.dgdirty(allPlugs=True)
         return rig_build_result
 
     def _run_tests(self, tests: Iterable[type[RigBuildTest]]) -> bool:
@@ -70,7 +71,11 @@ class RigPublisher:
         return test_runner.run_tests()
 
     def _publish_rig_model(self, rig: RigDefinition):
-        from dcc.maya.publish.usdchaser.export import ExportChaser, ExportChaserMode
+        RIG_GEO_PATH = "/rig/geo"
+        from dcc.maya.publish.usdchaser.export import (
+            ExportChaser,
+            ExportChaserMode,
+        )
 
         publish_asset = self._conn.get_asset(name=rig.name)
         publish_asset_paths = paths_for_asset(publish_asset)
@@ -85,28 +90,42 @@ class RigPublisher:
                 chaserArgs=[(ExportChaser.ID, "mode", ExportChaserMode.RIG)],
                 exportCollectionBasedBindings=True,
                 exportMaterialCollections=True,
-                materialCollectionsPath="/rig/geo",
+                materialCollectionsPath=str(RIG_GEO_PATH),
                 shadingMode="useRegistry",
             )
         log.info(
             f"PUBLISH: {rig.name} rig model USD published to {rig_model_publish_path}"
         )
 
-    def _publish_rig(self, rig: RigDefinition) -> bool:
+    def _publish_rig(
+        self, rig: RigDefinition, publish_message: str | None = None
+    ) -> bool:
         publish_asset = self._conn.get_asset(name=rig.name)
         publish_asset_paths = paths_for_asset(publish_asset)
         rig_publish_path = publish_asset_paths.rig_path
         rig_versions_path = publish_asset_paths.rig_versions_path
 
-        next_version_number = next_version(
+        version_number = next_version(
             publish_asset_paths.rig_versions_path, stem=rig.name, ext="mb"
         )
         rig_version_filepath = rig_versions_path / versioned_filename(
-            stem=rig.name, ext="mb", version=next_version_number
+            stem=rig.name, ext="mb", version=version_number
         )
 
         cmds.select("rig")
-        cmds.file(str(rig_version_filepath), exportSelected=True, type="mayaBinary")
+        cmds.file(
+            str(rig_version_filepath),
+            exportSelected=True,
+            type="mayaBinary",
+            options="v=0;",
+            constructionHistory=True,
+            expressions=True,
+            constraints=True,
+            shader=True,
+            channels=True,
+            preserveReferences=True,
+            exportUnloadedReferences=False,
+        )
         log.info(
             f"PUBLISH: {rig.name} was successfully built and published to {rig_version_filepath}"
         )
@@ -126,7 +145,9 @@ class RigPublisher:
         self.publish_progress.finish_step()
         return True
 
-    def build_test_and_publish(self, rig: RigDefinition):
+    def build_test_and_publish(
+        self, rig: RigDefinition, publish_message: str | None = None
+    ):
         build_complete = self._build_rig(rig)
         if not build_complete:
             log.error(f"{rig.name} failed to build properly and wasn't published!")
@@ -138,5 +159,5 @@ class RigPublisher:
             )
             return
         else:
-            self._publish_rig(rig)
+            self._publish_rig(rig, publish_message)
             self._publish_rig_model(rig)
