@@ -35,6 +35,7 @@ dev = [
     # boot `pipe telemetry up` need it; workstations that only emit telemetry
     # don't. Lives in `dev` so type checking always finds it.
     "psycopg[binary]>=3.2,<4",
+    "nxt-core>=0.21.2",
 ]
 
 [tool.ruff]
@@ -50,6 +51,7 @@ exclude = [
     'y-rig',
     "studiolibrary",
     "timeline_marker",
+    "src/dcc/maya/site/plugins/nxt_maya.py",
     "src/dcc/maya/third_party/**"
 ]
 
@@ -91,6 +93,7 @@ exclude = [
     "src/**/studiolibrary/**",
     "src/**/timeline_marker/**",
     "src/**/houdini/site/scripts/**",
+    "src/dcc/maya/site/plugins/nxt_maya.py",
     "src/dcc/maya/third_party/**",
     "src/dcc/houdini/site/**/scripts/"
 ]
