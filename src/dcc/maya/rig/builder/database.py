@@ -1,7 +1,16 @@
+import re
+
 from env_sg import DB_Config
 from Qt import QtCore
 
 from core.shotgrid import ShotGrid
+
+
+def natural_sort_key(value: str):
+    return [
+        int(part) if part.isdigit() else part.lower()
+        for part in re.split(r"(\d+)", value)
+    ]
 
 
 class DBWorker(QtCore.QObject):
@@ -19,11 +28,17 @@ class DBWorker(QtCore.QObject):
 
     def get_asset_by_tag(self, tag: str) -> list[tuple[str, str]]:
         assets = self._get_database().find_assets(tags={tag})
-        return [(asset.name, asset.display_name) for asset in assets]
+        return sorted(
+            [(asset.name, asset.display_name) for asset in assets],
+            key=lambda x: natural_sort_key(x[0]),
+        )
 
     def get_asset_by_type(self, type: str) -> list[tuple[str, str]]:
         assets = self._get_database().find_assets(type=type)
-        return [(asset.name, asset.display_name) for asset in assets]
+        return sorted(
+            [(asset.name, asset.display_name) for asset in assets],
+            key=lambda x: natural_sort_key(x[0]),
+        )
 
     def get_rig_data(self) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
         characters = self.get_asset_by_type(type="Character")

@@ -5,11 +5,15 @@ from pathlib import Path
 from typing import Callable
 
 from maya import cmds
+
 from core.util.paths import get_rig_build_path
 
 from .progress import RigBuildProgressManager
 
 log = logging.getLogger(__name__)
+
+RIG_ROOT: str = "|rig"
+ASSET_ID_ATTR: str = "asset_id"
 
 
 @dataclass
@@ -30,16 +34,28 @@ def has_local_override_directory(
     return False
 
 
-def resolve_rig_build_asset_root(
-    rig: RigDefinition,
+def resolve_root_paths(
     local_override: Path | None = None,
-) -> Path:
+) -> tuple[Path, ...]:
     if local_override is not None:
-        override_asset_root = local_override / rig.type / rig.name
-        if override_asset_root.exists():
-            return override_asset_root
-    asset_root = get_rig_build_path() / rig.type / rig.name
-    return asset_root
+        return (local_override, get_rig_build_path())
+    else:
+        return (get_rig_build_path(),)
+
+
+def get_rig_path_from_rig_definition(rig: RigDefinition) -> Path:
+    return Path(rig.type) / Path(rig.name)
+
+
+def open_editor(
+    rig: RigDefinition | None = None,
+    override_directory: Path | None = None,
+):
+    from yrig.build import open_rig_in_editor
+
+    root_paths = resolve_root_paths(override_directory)
+    rig_path = get_rig_path_from_rig_definition(rig) if rig is not None else None
+    open_rig_in_editor(root_paths, rig_path)
 
 
 @contextmanager
@@ -60,6 +76,13 @@ def redirect_external_logger(
         # Restore original state exactly as it was
         external_logger.parent = original_parent
         external_logger.propagate = original_propagate
+
+
+def add_rig_asset_id(asset_id: str):
+    asset_id_full_attr = f"{RIG_ROOT}.{ASSET_ID_ATTR}"
+    if not cmds.objExists(asset_id_full_attr):
+        cmds.addAttr(RIG_ROOT, longName=ASSET_ID_ATTR, dataType="string")
+    cmds.setAttr(asset_id_full_attr, asset_id, type="string")
 
 
 class RigBuilder:
@@ -85,32 +108,25 @@ class RigBuilder:
 
         It should return a bool: True if the rig built successfully and False if it failed or was cancelled.
         """
-        from yrig.build import build_from_path
+        from yrig.build import build_rig
 
         # Grab the external logger
         build_logger = logging.getLogger("yrig")
-
-        # Get paths.
-        rig_build_path = resolve_rig_build_asset_root(rig, override_directory)
-        guide_path = rig_build_path / "data/guide.sgt"
-
-        if not guide_path.exists():
-            error_message = f"Couldn't find the build data for {rig.name}. The build file should be located at {guide_path}"
-            log.error(error_message)
-            raise FileNotFoundError(error_message)
 
         progress_manager = RigBuildProgressManager()
         if self._progress_slot is not None:
             progress_manager.progress_changed.connect(self._progress_slot)
         with redirect_external_logger(build_logger, log):
             cmds.file(newFile=True, force=True)
-            build_result = build_from_path(
-                rig_root_path=rig_build_path,
+            build_result = build_rig(
+                root_paths=resolve_root_paths(override_directory),
+                rig_path=get_rig_path_from_rig_definition(rig),
                 dev_build=dev_build,
                 build_scope=build_scope,
                 progress_callback=progress_manager.update_progress_with_step,
             )
         if build_result is False:
             return False  # Early return to avoid finishing the progress bar
+        add_rig_asset_id(rig.name)
         progress_manager.update_progress_with_step(1)
         return build_result
